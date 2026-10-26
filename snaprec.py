@@ -49,13 +49,15 @@ def enable_dpi_awareness():
 
 
 def find_ffmpeg():
-    """依次在：环境变量、程序所在文件夹、PATH 中查找 ffmpeg。"""
+    """依次在：环境变量、程序所在文件夹、exe 内置、PATH 中查找 ffmpeg。"""
     exe = "ffmpeg.exe" if IS_WIN else "ffmpeg"
     candidates = []
     if os.environ.get("SNAPREC_FFMPEG"):
         candidates.append(Path(os.environ["SNAPREC_FFMPEG"]))
     if getattr(sys, "frozen", False):
         candidates.append(Path(sys.executable).parent / exe)
+        if hasattr(sys, "_MEIPASS"):  # 单文件 exe 运行时解压出的内置 ffmpeg
+            candidates.append(Path(sys._MEIPASS) / exe)
     candidates.append(Path(__file__).resolve().parent / exe)
     for c in candidates:
         if c.is_file():
@@ -192,7 +194,7 @@ def build_record_cmd(ffmpeg, screen, quality, mic, out_path):
     q = quality
     cmd = [ffmpeg, "-hide_banner", "-nostats", "-loglevel", "warning", "-y"]
     if IS_WIN:
-        cmd += ["-thread_queue_size", "512", "-f", "gdigrab", "-framerate", str(q["fps"]),
+        cmd += ["-f", "gdigrab", "-framerate", str(q["fps"]),
                 "-draw_mouse", "1"]
         if screen is not None:
             cmd += ["-offset_x", str(screen["x"]), "-offset_y", str(screen["y"]),
@@ -201,14 +203,14 @@ def build_record_cmd(ffmpeg, screen, quality, mic, out_path):
     else:
         screen = screen or list_screens()[0]
         display = os.environ.get("DISPLAY", ":0")
-        cmd += ["-thread_queue_size", "512", "-f", "x11grab", "-framerate", str(q["fps"]),
+        cmd += ["-f", "x11grab", "-framerate", str(q["fps"]),
                 "-draw_mouse", "1", "-video_size", f"{screen['w']}x{screen['h']}",
                 "-i", f"{display}+{screen['x']},{screen['y']}"]
     if mic:
         if IS_WIN:
-            cmd += ["-thread_queue_size", "512", "-f", "dshow", "-i", f"audio={mic}"]
+            cmd += ["-f", "dshow", "-i", f"audio={mic}"]
         else:
-            cmd += ["-thread_queue_size", "512", "-f", "pulse", "-i", mic]
+            cmd += ["-f", "pulse", "-i", mic]
 
     # 宽高必须是偶数；超过 max_w 的高分屏等比缩小，既省体积又不影响看清文字
     if q["max_w"]:
@@ -491,7 +493,7 @@ def run_gui():
                 self.start_btn.configure(state="disabled")
                 self.status.configure(
                     foreground="#c00000",
-                    text="找不到 ffmpeg.exe。请确认它和 SnapRec.exe 放在同一个文件夹里。")
+                    text="找不到录制组件 ffmpeg，请重新下载 SnapRec.exe。")
             elif IS_WIN:
                 threading.Thread(target=self._load_mics, daemon=True).start()
             self.root.after(200, self.poll_results)
@@ -691,8 +693,32 @@ def run_gui():
     root.mainloop()
 
 
+def selftest():
+    """录 2 秒主屏幕，返回结果文字（供打包后自动检查用：SnapRec.exe --selftest 结果.txt）。"""
+    ffmpeg = find_ffmpeg()
+    if not ffmpeg:
+        return "FAIL 找不到 ffmpeg"
+    quality = next(q[2] for q in QUALITIES if q[0] == DEFAULT_QUALITY)
+    out = Path(tempfile.mkdtemp(prefix="snaprec_selftest_")) / "selftest.mp4"
+    rec = Recorder(ffmpeg, list_screens()[0], quality, None, out)
+    try:
+        rec.start_segment()
+        time.sleep(2)
+        if not rec.is_running():
+            return "FAIL 录制进程提前退出\n" + rec.log_tail()
+        path = rec.finish()
+        return f"OK ffmpeg={ffmpeg} size={path.stat().st_size}"
+    except Exception as e:
+        return f"FAIL {e}"
+    finally:
+        shutil.rmtree(out.parent, ignore_errors=True)
+
+
 def main():
     enable_dpi_awareness()
+    if len(sys.argv) == 3 and sys.argv[1] == "--selftest":
+        Path(sys.argv[2]).write_text(selftest(), encoding="utf-8")
+        return
     run_gui()
 
 

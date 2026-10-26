@@ -11,9 +11,11 @@
 
 ## 下载使用
 
-1. 打开本仓库的 **Actions** 页面 → 点最新一次成功的“打包 Windows 版” → 在页面底部 **Artifacts** 里下载 `SnapRec-Windows`。
-   （如果有 **Releases**，也可以直接在 Releases 里下载 `SnapRec-Windows.zip`。）
-2. 解压，双击 `SnapRec.exe`。`ffmpeg.exe` 要和它放在同一个文件夹。
+只有一个 `SnapRec.exe`，不用安装，双击就能运行（录制组件 ffmpeg 已经内置在里面）。
+
+1. 打开本仓库的 **Actions** 页面 → 点最新一次成功的“打包 Windows 版” → 在页面底部 **Artifacts** 里下载 `SnapRec-Windows`，解压出 `SnapRec.exe`。
+   （如果有 **Releases**，可以直接在 Releases 里下载 `SnapRec.exe`。）
+2. 双击 `SnapRec.exe`。每次启动要先解压内置组件，会等 2–3 秒。
 
 详细说明见 [docs/使用说明.txt](docs/使用说明.txt)。
 
@@ -32,4 +34,4 @@
 - 测试：`python tests/smoke_test.py`（会真实录几秒屏幕）。
 - 每次推送代码，GitHub Actions 会自动在 Windows 上测试并打包；打 `v*` 标签（如 `v1.0.0`）会自动发布 Release。
 
-打包附带的 ffmpeg 来自 [BtbN/FFmpeg-Builds](https://github.com/BtbN/FFmpeg-Builds)（GPL 许可）。
+打包内置的 ffmpeg 来自 [gyan.dev](https://www.gyan.dev/ffmpeg/builds/) 的稳定版（GPL 许可）。

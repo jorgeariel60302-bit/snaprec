@@ -24,10 +24,15 @@ jobs:
       - name: 安装打包工具
         run: pip install pyinstaller
 
-      - name: 下载 ffmpeg
+      - name: 下载 ffmpeg（稳定版）
         shell: pwsh
         run: |
-          Invoke-WebRequest "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip" -OutFile ffmpeg.zip
+          try {
+            Invoke-WebRequest "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip" -OutFile ffmpeg.zip
+          } catch {
+            Write-Host "gyan.dev 下载失败，改用 BtbN 构建：$_"
+            Invoke-WebRequest "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip" -OutFile ffmpeg.zip
+          }
           Expand-Archive ffmpeg.zip -DestinationPath ffmpeg_tmp
           $bin = Get-ChildItem ffmpeg_tmp -Recurse -Filter ffmpeg.exe | Select-Object -First 1
           Copy-Item $bin.FullName .\ffmpeg.exe
@@ -36,26 +41,30 @@ jobs:
       - name: 冒烟测试（真实录屏几秒）
         run: python tests/smoke_test.py
 
-      - name: 打包 SnapRec.exe
-        run: pyinstaller --noconfirm --onefile --windowed --name SnapRec snaprec.py
+      - name: 打包成单个 SnapRec.exe（内置 ffmpeg）
+        run: pyinstaller --noconfirm --onefile --windowed --name SnapRec --add-binary "ffmpeg.exe;." snaprec.py
 
-      - name: 整理发布文件夹
+      - name: 检查打包好的 exe 能独立录屏
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Force package\SnapRec | Out-Null
-          Copy-Item dist\SnapRec.exe package\SnapRec\
-          Copy-Item ffmpeg.exe package\SnapRec\
-          Copy-Item docs\使用说明.txt package\SnapRec\
-          Compress-Archive package\SnapRec -DestinationPath SnapRec-Windows.zip
+          New-Item -ItemType Directory -Force release | Out-Null
+          Copy-Item dist\SnapRec.exe release\
+          Remove-Item .\ffmpeg.exe   # 确保 exe 用的是自己内置的 ffmpeg
+          Start-Process -FilePath release\SnapRec.exe -ArgumentList "--selftest", "$PWD\selftest.txt" -Wait
+          $result = Get-Content selftest.txt -Raw -Encoding utf8
+          Write-Host $result
+          if (-not $result.StartsWith("OK")) { exit 1 }
+          Remove-Item selftest.txt
+          "{0:N1} MB" -f ((Get-Item release\SnapRec.exe).Length / 1MB)
 
       - name: 上传构建结果
         uses: actions/upload-artifact@v4
         with:
           name: SnapRec-Windows
-          path: package/
+          path: release/SnapRec.exe
 
       - name: 发布 Release（仅打 v* 标签时）
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          files: SnapRec-Windows.zip
+          files: release/SnapRec.exe
