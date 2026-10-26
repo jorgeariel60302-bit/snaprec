@@ -1,0 +1,74 @@
+name: 打包 Windows 版
+
+on:
+  push:
+    branches: ["**"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    env:
+      PYTHONUTF8: "1"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: 安装打包工具
+        run: pip install pyinstaller
+
+      - name: 下载 ffmpeg（稳定版）
+        shell: pwsh
+        run: |
+          try {
+            Invoke-WebRequest "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip" -OutFile ffmpeg.zip
+          } catch {
+            Write-Host "gyan.dev 下载失败，改用 BtbN 构建：$_"
+            Invoke-WebRequest "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip" -OutFile ffmpeg.zip
+          }
+          Expand-Archive ffmpeg.zip -DestinationPath ffmpeg_tmp
+          $bin = Get-ChildItem ffmpeg_tmp -Recurse -Filter ffmpeg.exe | Select-Object -First 1
+          Copy-Item $bin.FullName .\ffmpeg.exe
+          .\ffmpeg.exe -hide_banner -version | Select-Object -First 1
+
+      - name: 冒烟测试（真实录屏几秒）
+        run: python tests/smoke_test.py
+
+      - name: 打包成单个 SnapRec.exe（内置 ffmpeg）
+        run: pyinstaller --noconfirm --onefile --windowed --name SnapRec --icon assets\icon.ico --add-data "assets\icon.ico;assets" --add-binary "ffmpeg.exe;." snaprec.py
+
+      - name: 检查打包好的 exe 能独立录屏
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force release | Out-Null
+          Copy-Item dist\SnapRec.exe release\
+          Remove-Item .\ffmpeg.exe   # 确保 exe 用的是自己内置的 ffmpeg
+          Start-Process -FilePath release\SnapRec.exe -ArgumentList "--selftest", "$PWD\selftest.txt" -Wait
+          $result = Get-Content selftest.txt -Raw -Encoding utf8
+          Write-Host $result
+          if (-not $result.StartsWith("OK") -or -not $result.Contains("icon=yes")) { exit 1 }
+          Remove-Item selftest.txt
+          "{0:N1} MB" -f ((Get-Item release\SnapRec.exe).Length / 1MB)
+
+      - name: 上传构建结果
+        uses: actions/upload-artifact@v4
+        with:
+          name: SnapRec-Windows
+          path: release/SnapRec.exe
+
+      - name: 发布到 Releases（仅 main 分支）
+        if: github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: snaprec-latest
+          name: SnapRec 录屏
+          body: 下载 SnapRec.exe，双击即可运行（Windows 10/11 64 位），不用安装。
+          prerelease: false
+          make_latest: true
+          files: release/SnapRec.exe

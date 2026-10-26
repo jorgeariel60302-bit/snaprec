@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+build/
+dist/
+package/
+*.spec
+ffmpeg.exe
+ffmpeg.zip
+ffmpeg_tmp/
+*.mp4
