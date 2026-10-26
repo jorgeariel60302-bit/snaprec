@@ -42,7 +42,7 @@ jobs:
         run: python tests/smoke_test.py
 
       - name: 打包成单个 SnapRec.exe（内置 ffmpeg）
-        run: pyinstaller --noconfirm --onefile --windowed --name SnapRec --add-binary "ffmpeg.exe;." snaprec.py
+        run: pyinstaller --noconfirm --onefile --windowed --name SnapRec --icon assets\icon.ico --add-data "assets\icon.ico;assets" --add-binary "ffmpeg.exe;." snaprec.py
 
       - name: 检查打包好的 exe 能独立录屏
         shell: pwsh
@@ -53,7 +53,7 @@ jobs:
           Start-Process -FilePath release\SnapRec.exe -ArgumentList "--selftest", "$PWD\selftest.txt" -Wait
           $result = Get-Content selftest.txt -Raw -Encoding utf8
           Write-Host $result
-          if (-not $result.StartsWith("OK")) { exit 1 }
+          if (-not $result.StartsWith("OK") -or -not $result.Contains("icon=yes")) { exit 1 }
           Remove-Item selftest.txt
           "{0:N1} MB" -f ((Get-Item release\SnapRec.exe).Length / 1MB)
 

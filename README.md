@@ -32,6 +32,8 @@
 - 代码只有一个文件 `snaprec.py`，只用 Python 标准库（tkinter），录制和编码由 ffmpeg 完成。
 - 本地运行：安装 Python 3 和 ffmpeg，执行 `python snaprec.py`。
 - 测试：`python tests/smoke_test.py`（会真实录几秒屏幕）。
+- 图标：企鹅系列图标（和 [snaptool](https://github.com/jorgeariel60302-bit/snaptool) 是一套），
+  由 `python tools/make_icons.py 输出目录` 生成，改颜色或造型后重新生成即可。
 - 每次推送代码，GitHub Actions 会自动在 Windows 上测试并打包；打 `v*` 标签（如 `v1.0.0`）会自动发布 Release。
 
 打包内置的 ffmpeg 来自 [gyan.dev](https://www.gyan.dev/ffmpeg/builds/) 的稳定版（GPL 许可）。

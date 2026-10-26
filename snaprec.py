@@ -65,6 +65,12 @@ def find_ffmpeg():
     return shutil.which("ffmpeg")
 
 
+def resource_path(*parts):
+    """程序自带的资源文件：打包后在 exe 的解压目录，开发时在源码目录。"""
+    base = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
+    return base.joinpath(*parts)
+
+
 def list_screens(fallback_size=(1920, 1080)):
     """返回屏幕列表，每项是 dict(x, y, w, h, primary)，主屏幕排在最前。"""
     screens = []
@@ -408,6 +414,14 @@ def run_gui():
 
             root.title(APP_NAME)
             root.resizable(False, False)
+            try:  # 窗口和任务栏图标
+                if IS_WIN:
+                    root.iconbitmap(default=str(resource_path("assets", "icon.ico")))
+                else:
+                    self.icon = tk.PhotoImage(file=str(resource_path("assets", "icon.png")))
+                    root.iconphoto(True, self.icon)
+            except Exception:
+                pass
             root.protocol("WM_DELETE_WINDOW", self.on_close)
             if IS_WIN:
                 for name in ("TkDefaultFont", "TkTextFont", "TkMenuFont", "TkHeadingFont"):
@@ -707,7 +721,8 @@ def selftest():
         if not rec.is_running():
             return "FAIL 录制进程提前退出\n" + rec.log_tail()
         path = rec.finish()
-        return f"OK ffmpeg={ffmpeg} size={path.stat().st_size}"
+        icon = "yes" if resource_path("assets", "icon.ico").is_file() else "no"
+        return f"OK ffmpeg={ffmpeg} size={path.stat().st_size} icon={icon}"
     except Exception as e:
         return f"FAIL {e}"
     finally:
