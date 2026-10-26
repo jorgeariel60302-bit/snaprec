@@ -3,7 +3,6 @@ name: 打包 Windows 版
 on:
   push:
     branches: ["**"]
-    tags: ["v*"]
   workflow_dispatch:
 
 permissions:
@@ -63,8 +62,13 @@ jobs:
           name: SnapRec-Windows
           path: release/SnapRec.exe
 
-      - name: 发布 Release（仅打 v* 标签时）
-        if: startsWith(github.ref, 'refs/tags/v')
+      - name: 发布到 Releases（仅 main 分支）
+        if: github.ref == 'refs/heads/main'
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: snaprec-latest
+          name: SnapRec 录屏
+          body: 下载 SnapRec.exe，双击即可运行（Windows 10/11 64 位），不用安装。
+          prerelease: false
+          make_latest: true
           files: release/SnapRec.exe
